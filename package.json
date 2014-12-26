@@ -1,0 +1,22 @@
+{
+  "name": "bank-to-qif",
+  "version": "0.1.0",
+  "description": "Bank data to qif conversion software.",
+  "devDependencies": {
+    "gulp": "^3.6.2",
+    "gulp-cachebust": "0.0.2",
+    "gulp-clean": "^0.2.4",
+    "gulp-csslint": "^0.1.4",
+    "gulp-csso": "^0.2.8",
+    "gulp-imagemin": "^0.2.0",
+    "gulp-jshint": "^1.5.5",
+    "gulp-livereload": "^1.3.1",
+    "gulp-uglify": "^0.2.1",
+    "gulp-util": "^2.2.14",
+    "express": "^3.5.2",
+    "tiny-lr": "0.0.5",
+    "connect-livereload": "^0.3.2",
+    "jshint-stylish": "^0.1.5",
+    "browserify": "^7.0.3"
+  }
+}
