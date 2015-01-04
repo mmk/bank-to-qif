@@ -1,0 +1,14 @@
+Tilinumero	FI1234567890123456
+
+Kirjauspäivä	Arvopäivä	Maksupäivä	Määrä	Saaja/Maksaja	Tilinumero	BIC	Tapahtuma	Viite	Maksajan viite	Viesti	Kortinnumero	Kuitti	
+
+03.02.2014	01.02.2014	01.02.2014	-100,00	SMITH JOHN	9998888-777666	NDEAFIHH	Oma siirto						
+
+03.02.2014	03.02.2014	03.02.2014	-700,88	DOE JANE	3131313-33312	NDEAFIHHXXX	Itsepalvelu			Comment 			
+
+03.02.2014	03.02.2014	03.02.2014	-43,34	XYZ123	123123-98765	NDEAFIHH	e-lasku	1234 1234					
+
+03.02.2014	03.02.2014	03.02.2014	-16,12	Restaurant XYZ			Korttiosto	123123123		Helsinki 	9999111113333388888		
+
+04.02.2014	04.02.2014	04.02.2014	-22,62	Some Supermarket 123			Korttiosto	321321321		Helsinki 	6666666655555333333		
+
