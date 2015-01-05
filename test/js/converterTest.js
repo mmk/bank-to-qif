@@ -41,22 +41,22 @@ describe('converter', function () {
 
             var transactionCategorizer = new TransactionCategorizer();
 
-            converter.convert(inputFileContainers, transactionCategorizer, function (outputFileContainers) {
+            converter.convert(inputFileContainers, transactionCategorizer, function (outputAccounts, qifFileContent) {
                 try {
-                    should(outputFileContainers).not.be.null;
-                    outputFileContainers.should.be.instanceof(Array).and.have.lengthOf(2);
+                    should(outputAccounts).not.be.null;
+                    outputAccounts.should.be.instanceof(Array).and.have.lengthOf(2);
 
-                    _.each(outputFileContainers, function (container) {
-                        should(container).should.not.be.null;
-                        should(container.error).be.null;
-                        should(container.qifFileContent).be.instanceof(String);
+                    _.times(inputFileContainers.length, function (index) {
+                        var inputFileContainer = inputFileContainers[index];
+                        var outputAccount = outputAccounts[index];
+
+                        should(outputAccount).not.be.null;
+                        should(outputAccount.error).be.null;
+                        should(outputAccount.transactions).not.be.null;
+                        should(outputAccount.accountName).be.equal(inputFileContainer.accountName);
                     });
 
-                    var opContainer = outputFileContainers[0];
-                    var nordeaContainer = outputFileContainers[1];
-
-                    should(opContainer.fileType).be.equal('op');
-                    should(nordeaContainer.fileType).be.equal('nordea');
+                    should(qifFileContent).be.instanceof(String);
 
                     done();
                 }

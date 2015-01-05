@@ -8,13 +8,19 @@
 
 var _ = require('underscore');
 
-var generateQifHeader = function (bankAccountName) {
-    var header = "!Account\n" +
-                 "N" + bankAccountName + "\n" +
-                 "TBank\n" +
-                 "^\n" +
-                 "!Type:Bank\n";
-    return header;
+var generateQifAccountList = function (outputAccounts) {
+    var output = "!Option:AutoSwitch\n" +
+                 "!Account\n";
+
+    _.each(outputAccounts, function (outputAccount) {
+        output += "N" + outputAccount.accountName + "\n";
+        output += "TBank\n";
+        output += "^\n";
+    });
+
+    output += "!Clear:AutoSwitch\n";
+
+    return output;
 };
 
 var generateQifTransaction = function (transaction) {
@@ -23,7 +29,10 @@ var generateQifTransaction = function (transaction) {
     output += 'D' + transaction.date + "\n";
     output += 'P' + transaction.payee + "\n";
     output += 'T' + transaction.amount + "\n";
-    output += 'L[' + transaction.category + "]\n";
+
+    if (transaction.category) {
+        output += 'L[' + transaction.category + "]\n";
+    }
 
     if (transaction.memo) {
         output += 'M' + transaction.memo + "\n";
@@ -34,12 +43,24 @@ var generateQifTransaction = function (transaction) {
     return output;
 };
 
-var exportQif = function (bankAccountName, transactions) {
+var generateQifTransactionsForAccount = function (outputAccount) {
+    var output = "!Account\n" +
+                 "N" + outputAccount.accountName + "\n" +
+                 "^\n" +
+                 "!Type:Bank\n";
 
-    var output = generateQifHeader(bankAccountName);
-
-    _.each(transactions, function (transaction) {
+    _.each(outputAccount.transactions, function (transaction) {
         output += generateQifTransaction(transaction);
+    });
+
+    return output;
+};
+
+var exportQif = function (outputAccounts) {
+    var output = generateQifAccountList(outputAccounts);
+
+    _.each(outputAccounts, function (outputAccount) {
+        output += generateQifTransactionsForAccount(outputAccount);
     });
 
     return output;

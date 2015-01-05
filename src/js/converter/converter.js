@@ -12,6 +12,17 @@ var opBankImporter     = require('./opBankImporter');
 var qifExporter        = require('./qifExporter');
 
 /**
+ * QIF transaction.
+ *
+ * @typedef {Object} Transaction
+ * @property {string} date - Date.
+ * @property {string} payee - Payee / description. This will end up in the "Description" field in GnuCash.
+ * @property {string} amount - Amount of money. Dot as decimal separator.
+ * @property {string} category - Category / account.
+ * @property {string} memo - Memo text. Will not show up in GnuCash.
+ */
+
+/**
  * InputFileContainer describes an input file to the converter.
  *
  * @typedef {Object} InputFileContainer
@@ -22,13 +33,11 @@ var qifExporter        = require('./qifExporter');
  */
 
 /**
- * OutputFileContainer describes an output file from the converter.
+ * OutputAccount describes the conversion result of a single bank account.
  *
- * @typedef {Object} OutputFileContainer
- * @property {string} qifFileContent - Content of the output QIF file, or null if the conversion failed.
- * @property {string} fileType - One of 'op', 'nordea'.
+ * @typedef {Object} OutputAccount
  * @property {string} accountName - Name of the account in GnuCash or other software. Example: 'Assets:Current Assets:Nordea account'.
- * @property {string} ibanAccountNumber - International Bank Account Number.
+ * @property {Transaction[]} transactions - Loaded transactions, or null if conversion failed.
  * @property {Error} error - Error object if an error occurred during conversion, null otherwise.
  */
 
@@ -37,7 +46,7 @@ var qifExporter        = require('./qifExporter');
  */
 var importTransactions = function (inputFileContainers) {
 
-    var outputFileContainers = [];
+    var outputAccounts = [];
 
     var promises = [];
     var mainDeferred = Q.defer();
@@ -46,10 +55,12 @@ var importTransactions = function (inputFileContainers) {
         var importer;
         var promise;
 
-        var outputFileContainer = _.pick(inputFileContainer, 'fileType', 'accountName', 'ibanAccountNumber');
-        outputFileContainer.transactions = null;
-        outputFileContainer.error = null;
-        outputFileContainers.push(outputFileContainer);
+        var outputAccount = {
+            accountName: inputFileContainer.accountName,
+            transactions: null,
+            error: null
+        };
+        outputAccounts.push(outputAccount);
 
         if (inputFileContainer.fileType === 'op') {
             importer = opBankImporter;
@@ -61,14 +72,14 @@ var importTransactions = function (inputFileContainers) {
         if (importer) {
             promise = importer.importTransactions(inputFileContainer.fileContent)
                 .then(function (transactions) {
-                    outputFileContainer.transactions = transactions;
+                    outputAccount.transactions = transactions;
                 })
                 .catch(function (error) {
-                    outputFileContainer.error = error;
+                    outputAccount.error = error;
                 });
         }
         else {
-            outputFileContainer.error = new Error("Unknown input file type: '" + inputFileContainer.fileType + "'");
+            outputAccount.error = new Error("Unknown input file type: '" + inputFileContainer.fileType + "'");
             promise = Q.defer().resolve().promise;
         }
 
@@ -76,69 +87,67 @@ var importTransactions = function (inputFileContainers) {
     });
 
     Q.allSettled(promises).then(function () {
-        mainDeferred.resolve(outputFileContainers);
+        mainDeferred.resolve(outputAccounts);
     });
 
     return mainDeferred.promise;
 };
 
-var categorizeTransactions = function (outputFileContainers, transactionCategorizer) {
-    _.each(outputFileContainers, function (outputFileContainer) {
-        if (outputFileContainer.error) {
-            return;
-        }
-
-        _.each(outputFileContainer.transactions, function (transaction) {
+var categorizeTransactions = function (outputAccounts, transactionCategorizer) {
+    _.chain(outputAccounts)
+        .filter(function (outputAccount) {
+            return !outputAccount.error;
+        })
+        .pluck('transactions')
+        .flatten()
+        .each(function (transaction) {
             transaction.category = transactionCategorizer.decideCategory(transaction);
         });
-    });
 };
 
 /*
  * Find transactions between user's own accounts, fix their categories and remove duplicate transactions.
  */
-var handleTransactionsBetweenOwnAccounts = function (outputFileContainers) {
+var handleTransactionsBetweenOwnAccounts = function (outputAccounts) {
     // TODO
 };
 
 /*
- * Generate QIF file content from transactions.
+ * Generate a QIF file with all successfully loaded transactions from all accounts.
  */
-var generateQifFileContent = function (outputFileContainers) {
-    _.each(outputFileContainers, function (outputFileContainer) {
-        if (outputFileContainer.error) {
-            return;
-        }
-
-        outputFileContainer.qifFileContent =
-            qifExporter.exportQif(outputFileContainer.accountName, outputFileContainer.transactions);
-    });
+var generateQifFileContent = function (outputAccounts) {
+    return qifExporter.exportQif(_.filter(outputAccounts, function (outputAccount) {
+        return !outputAccount.error;
+    }));
 };
 
 /**
  * This callback is called when the conversion is finished.
  *
  * @callback ConversionDoneCallback
- * @param {OutputFileContainer[]} outputFileContainers Containers with the QIF file content and metadata.
+ * @param {OutputAccount[]} outputAccounts Account-specific information about conversion result.
+ * @param {string} qifFileContent QIF file content.
  */
 
 /**
  * Convert bank account data files to QIF files.
  *
  * If an error occurs during conversion of an {@link InputFileContainer}, the corresponding
- * {@link OutputFileContainer} will have the error property set to an Error object and
- * the qifFileContent property set to null.
+ * {@link OutputAccount} will have the error property set to an Error object and
+ * the transactions property set to null.
  *
  * @param {InputFileContainer[]} inputFileContainers - The input files to convert.
- * @param {ConversionDoneCallback} callback - The callback function which will be called with a {InputFileContainer[]} inputFileContainers - The input files to convert.
+ * @param {ConversionDoneCallback} callback - The callback function.
  */
 var convert = function (inputFileContainers, transactionCategorizer, callback) {
-    importTransactions(inputFileContainers).then(function (outputFileContainers) {
-        categorizeTransactions(outputFileContainers, transactionCategorizer);
-        handleTransactionsBetweenOwnAccounts(outputFileContainers);
-        generateQifFileContent(outputFileContainers);
+    importTransactions(inputFileContainers).then(function (outputAccounts) {
+        var qifFileContent;
 
-        callback(outputFileContainers);
+        categorizeTransactions(outputAccounts, transactionCategorizer);
+        handleTransactionsBetweenOwnAccounts(outputAccounts);
+        qifFileContent = generateQifFileContent(outputAccounts);
+
+        callback(outputAccounts, qifFileContent);
     });
 };
 
