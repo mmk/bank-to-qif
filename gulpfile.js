@@ -1,24 +1,20 @@
 var gulp        = require('gulp');
+var gutil       = require('gulp-util');
 var clean       = require('gulp-clean');
 var csslint     = require('gulp-csslint');
 var csso        = require('gulp-csso');
 var imagemin    = require('gulp-imagemin');
 var jshint      = require('gulp-jshint');
-var greload     = require('gulp-livereload');
 var uglify      = require('gulp-uglify');
-var gutil       = require('gulp-util');
 var cachebust   = require('gulp-cachebust')();
-
-var express     = require('express');
+var mocha       = require('gulp-mocha');
 var stylish     = require('jshint-stylish');
-var tiny        = require('tiny-lr');
-var connect     = require('connect-livereload');
+var browserify  = require('browserify');
+var source      = require('vinyl-source-stream');
 
-var SRC             = 'src/';
-var DST             = 'dist/';
-var LIVERELOAD_PORT = 35729;
-var EXPRESS_PORT    = 4000;
-var EXPRESS_ROOT    = __dirname + '/' + SRC;
+var SRC  = './src/';
+var TEST = './test/';
+var DST  = './dist/';
 
 // Clear the destination folder
 gulp.task('clean', function () {
@@ -28,7 +24,8 @@ gulp.task('clean', function () {
 
 // Copy all application files into the 'dist' folder except user css and images
 gulp.task('copy', ['clean'], function () {
-    return gulp.src([SRC + '**/*', '!'+SRC +'css/**/*.css', '!'+SRC +'js/**/*.js', '!'+SRC +'img/**/*'])
+    //return gulp.src([SRC + '**/*', '!' + SRC + 'css/**/*.css', '!' + SRC + 'js/**/*.js', '!' + SRC + 'img/**/*'])
+    return gulp.src([SRC + '**/*', '!' + SRC + 'js/**/*.js', '!' + SRC + 'img/**/*'])
         .pipe(gulp.dest(DST));
 });
 
@@ -42,7 +39,7 @@ gulp.task('css', ['clean'], function () {
 
 // Detect errors and potential problems in your css code
 gulp.task('csslint', function () {
-    return gulp.src([SRC + 'css/main.css', '!'+SRC +'css/normalize.css'])
+    return gulp.src([SRC + 'css/main.css', '!' + SRC + 'css/normalize.css'])
         .pipe(csslint('.csslintrc'))
         .pipe(csslint.reporter())
 });
@@ -50,16 +47,26 @@ gulp.task('csslint', function () {
 // Detect errors and potential problems in your JavaScript code (except vendor scripts)
 // You can enable or disable default JSHint options in the .jshintrc file
 gulp.task('jshint', function () {
-    return gulp.src([SRC + 'js/**/*.js', '!'+SRC +'js/vendor/**'])
+    return gulp.src([SRC + 'js/**/*.js', TEST + 'js/**/*.js', '!' + SRC + 'js/vendor/**'])
         .pipe(jshint('.jshintrc'))
         .pipe(jshint.reporter(stylish));
 });
 
-// Uglify and copy all JavaScript
 gulp.task('js', ['clean'], function () {
-    return gulp.src([SRC + 'js/**/*.js'])
-        .pipe(uglify())
+    return browserify(SRC + 'js/main.js', { debug: true })
+        .bundle()
+        .on('error', function (err) {
+            gutil.log(err);
+            this.end();
+        })
+        .pipe(source('bundle.js')) // output filename
         .pipe(gulp.dest(DST + 'js'));
+});
+
+gulp.task('other-js', ['clean'], function () {
+    return gulp.src([SRC + 'js/vendor/**/*.js'])
+        //.pipe(uglify())
+        .pipe(gulp.dest(DST + 'js/vendor'));
 });
 
 // Minify and copy images
@@ -70,36 +77,25 @@ gulp.task('images', ['clean'], function () {
 });
 
 // Inject cachebusting references into HTML
-gulp.task('html', ['clean', 'css', 'js'], function () {
+gulp.task('html', ['clean', 'css', 'other-js', 'js'], function () {
     return gulp.src(SRC + '*.html')
         .pipe(cachebust.references())
         .pipe(gulp.dest(DST));
 });
 
-// Start express- and live-reload-server
-gulp.task('serve', function () {
-    var server = express();
-    server.use(connect());
-    server.use(express.static(EXPRESS_ROOT));
-    server.listen(EXPRESS_PORT, function() {
-        gutil.log('Listening on port ' + EXPRESS_PORT);
-    });
-
-    var lr = tiny();
-    lr.listen(LIVERELOAD_PORT, function (err) {
-        if (err) {
-            gutil.log(err);
-        }
-    });
-
-    gulp.watch([SRC + '**/*.html', SRC + 'css/**/*.css', SRC + 'js/**/*.js'] , function (event) {
-        gulp.src(event.path, {read: false})
-            .pipe(greload(lr));
-    });
-});
-
 // Runs all checks on the code
 gulp.task('check', ['jshint', 'csslint']);
+
+gulp.task('test', function () {
+    return gulp.src(TEST + 'js/**/*.js', {read: false})
+        .pipe(mocha({reporter: 'nyan'}));
+});
+
+gulp.task('watch', function () {
+    gulp.watch(
+        [ SRC + "js/converter/*.js", SRC + "js/*.js", SRC + "**/*.html", SRC + "css/*.css"],
+        ['default']);
+});
 
 // The default task (called when you run `gulp`)
 gulp.task('default', ['check', 'copy', 'images', 'html']);

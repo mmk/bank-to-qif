@@ -13,83 +13,62 @@
         <link rel="stylesheet" href="css/bootstrap.min.css">
         <style>
             body {
-                padding-top: 50px;
+                padding-top: 80px;
                 padding-bottom: 20px;
             }
         </style>
         <link rel="stylesheet" href="css/bootstrap-theme.min.css">
         <link rel="stylesheet" href="css/main.css">
-
-        <script src="js/vendor/modernizr-2.6.2-respond-1.1.0.min.js"></script>
     </head>
     <body>
-        <!--[if lt IE 7]>
-            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
-        <![endif]-->
-    <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-      <div class="container">
-        <div class="navbar-header">
-          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
-            <span class="sr-only">Toggle navigation</span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
-          <a class="navbar-brand" href="#">Project name</a>
-        </div>
-        <div id="navbar" class="navbar-collapse collapse">
-          <form class="navbar-form navbar-right" role="form">
-            <div class="form-group">
-              <input type="text" placeholder="Email" class="form-control">
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <a class="navbar-brand" href="https://github.com/mmk/bank-to-qif">bank-to-qif</a>
             </div>
-            <div class="form-group">
-              <input type="password" placeholder="Password" class="form-control">
-            </div>
-            <button type="submit" class="btn btn-success">Sign in</button>
-          </form>
-        </div><!--/.navbar-collapse -->
-      </div>
-    </nav>
+          </div>
+        </nav>
 
-    <!-- Main jumbotron for a primary marketing message or call to action -->
-    <div class="jumbotron">
-      <div class="container">
-        <h1>Hello, world!</h1>
-        <p>This is a template for a simple marketing or informational website. It includes a large callout called a jumbotron and three supporting pieces of content. Use it as a starting point to create something more unique.</p>
-        <p><a class="btn btn-primary btn-lg" href="#" role="button">Learn more &raquo;</a></p>
-      </div>
+        <div class="container">
+            <div id="fileChooser" class="row text-center">
+                <h2>Choose input CSV files</h2>
+                <span class="btn btn-default btn-file">Browse &raquo; <input type="file" multiple></span>
+            </div>
+
+            <div id="selectedFiles">
+            </div>
+
+            <div class="row text-center h2">
+                <a class="downloadQif">Download QIF</a>
+                <span class="chooseAccountInstruction">Please choose a valid bank account for each file</span>
+            </div>
+        </div>
+
+<script id="selectedFileTemplate" type="x-tmpl-mustache">
+    <div class="row">
+        <div class="col-md-2">
+        </div>
+        <div class="selectedFile col-md-8">
+            <div class="panel panel-{{ status }}">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-8">
+                            <h3 class="panel-title">{{ filename }}</h3>
+                            <div class="accountChooser"></div>
+                        </div>
+                        <div class="col-xs-4">
+                            <span class="pull-right"><a data-class="removeFile"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span><span class="sr-only">Remove</span></a></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+</script>
 
-    <div class="container">
-      <!-- Example row of columns -->
-      <div class="row">
-        <div class="col-md-4">
-          <h2>Heading</h2>
-          <p>Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui. </p>
-          <p><a class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
-        </div>
-        <div class="col-md-4">
-          <h2>Heading</h2>
-          <p>Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui. </p>
-          <p><a class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
-       </div>
-        <div class="col-md-4">
-          <h2>Heading</h2>
-          <p>Donec sed odio dui. Cras justo odio, dapibus ac facilisis in, egestas eget quam. Vestibulum id ligula porta felis euismod semper. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus.</p>
-          <p><a class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
-        </div>
-      </div>
-
-      <hr>
-
-      <footer>
-        <p>&copy; Company 2014</p>
-      </footer>
-    </div> <!-- /container -->        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.js"></script>
-        <script>window.jQuery || document.write('<script src="js/vendor/jquery-1.11.1.js"><\/script>')</script>
+        <script src="js/bundle.js"></script>
 
         <script src="js/vendor/bootstrap.min.js"></script>
 
-        <script src="js/main.js"></script>
     </body>
 </html>
