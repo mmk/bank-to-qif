@@ -1,3 +1,9 @@
+/*
+ * Main file for bank-to-qif user interface code.
+ * 
+ * Entry point to the actual conversion logic can be found in converter/converter.js.
+ */
+
 'use strict';
 
 var $        = window.$ = window.jQuery = require('jquery'); // Make global for bootstrap

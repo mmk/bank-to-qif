@@ -130,7 +130,7 @@ var generateQifFileContent = function (outputAccounts) {
  */
 
 /**
- * Convert bank account data files to QIF files.
+ * Convert data from bank input files into a QIF file.
  *
  * If an error occurs during conversion of an {@link InputFileContainer}, the corresponding
  * {@link OutputAccount} will have the error property set to an Error object and
