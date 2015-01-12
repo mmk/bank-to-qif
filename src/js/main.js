@@ -17,14 +17,84 @@ var accountConfig          = require('./accountConfig');
 
 var transactionCategorizer = new TransactionCategorizer();
 
-var selectedFileTemplate = $('#selectedFileTemplate').html();
-mustache.parse(selectedFileTemplate);
+/**
+ * SelectedFile describes an input file chosen by the user.
+ *
+ * @typedef {Object} SelectedFile
+ * @property {string} file - File object from the file input element.
+ * @property {string} fileName - Filename of the input file.
+ * @property {string} fileContent - Content of the input file.
+ * @property {string} account - Account configuration.
+ */
 
-var qifFilename = 'result.qif';
-var selectedFiles = [];
+var downloadArea = {
 
-var $chooseAccountInstruction = $('.chooseAccountInstruction');
-var $downloadLink = $('.downloadQif');
+    qifFilename: 'result.qif',
+
+    $chooseAccountInstruction: $('.chooseAccountInstruction'),
+    $downloadLink: $('.downloadQif'),
+
+    hide: function () {
+        this.$downloadLink.hide();
+        this.$chooseAccountInstruction.hide();
+    },
+
+    displayInstructions: function () {
+        this.$downloadLink.hide();
+        this.$chooseAccountInstruction.show();
+    },
+
+    displayDownloadLink: function () {
+        this.$chooseAccountInstruction.hide();
+        this.$downloadLink.show();
+    },
+
+    setQifFileContent: function (qifFileContent) {
+        this.$downloadLink.attr({
+            'href': 'data:text/plain;charset=utf-8,' + encodeURIComponent(qifFileContent),
+            'download': this.qifFilename
+        });
+    }
+
+};
+
+var selectedFilesContainer = {
+    $el: $('#selectedFilesContainer'),
+    selectedFiles: [],
+
+    updateView: function () {
+        var invalidOrMissing = false;
+
+        _.each(this.selectedFiles, function (selectedFile) {
+            selectedFile.update();
+
+            if (selectedFile.error || !selectedFile.account) {
+                invalidOrMissing = true;
+            }
+        });
+
+        if (this.selectedFiles.length === 0) {
+            downloadArea.hide();
+        }
+        else if (invalidOrMissing) {
+            downloadArea.displayInstructions();
+        }
+        else {
+            downloadArea.displayDownloadLink();
+        }
+    },
+
+    addSelectedFile: function (selectedFile) {
+        var $selectedFileEl = selectedFile.render();
+        this.$el.append($selectedFileEl);
+
+        this.selectedFiles.push(selectedFile);
+
+        $selectedFileEl.find('a[data-class=removeFile]').on('click', function () {
+            // TODO
+        });
+    }
+};
 
 var baseSelectedFile = {
     filename: null,
@@ -33,6 +103,7 @@ var baseSelectedFile = {
     account: null,
     status: 'default',
     error: null,
+    template: null,
 
     _renderAccountChooser: function () {
         var $select = $('<select></select>');
@@ -62,112 +133,80 @@ var baseSelectedFile = {
         $panel.addClass('panel-' + this.status);
     },
 
+    _onChangeAccount: function (accountChooser) {
+        var selectedIndex = accountChooser.selectedIndex;
+        this.account = (selectedIndex === 0 ? null : accountConfig[selectedIndex - 1]);
+        this.update();
+
+        tryToConvertSelectedFiles();
+    },
+
     render: function () {
-        this.$el = $(mustache.render(selectedFileTemplate, {
+        this.$el = $(mustache.render(this.template, {
             filename: this.filename,
             status: this.status
         }));
-
-        this.$el.find('a[data-class=removeFile]').on('click', function () {
-            // TODO
-        });
 
         var $accountChooser = this._renderAccountChooser();
         this.$el.find('.accountChooser').append($accountChooser);
 
         $accountChooser.on('change', _.bind(function () {
-            var selectedIndex = $accountChooser[0].selectedIndex;
-            this.account = (selectedIndex === 0 ? null : accountConfig[selectedIndex - 1]);
-            this.update();
-            doConversion();
+            this._onChangeAccount($accountChooser[0]);
         }, this));
 
         return this.$el;
     }
 };
 
-var updateSelectedFiles = function () {
-    var invalidOrMissing = false;
+var handleConversionResults = function (outputAccounts, qifFileContent) {
 
-    _.each(selectedFiles, function (selectedFile) {
-        selectedFile.update();
-
-        if (selectedFile.error || !selectedFile.account) {
-            invalidOrMissing = true;
-        }
-    });
-
-    if (selectedFiles.length > 0) {
-        $downloadLink.toggle(!invalidOrMissing);
-        $chooseAccountInstruction.toggle(invalidOrMissing);
-    }
-    else {
-        $downloadLink.hide();
-        $chooseAccountInstruction.hide();
-    }
-};
-
-var convertInputFileContainers = function (inputFileContainers) {
-    converter.convert(inputFileContainers, transactionCategorizer, function (outputAccounts, qifFileContent) {
-        _.each(selectedFiles, function (selectedFile) {
-            var errorFound = false;
-
-            if (selectedFile.fileContent && selectedFile.account) {
-                _.each(outputAccounts, function (outputAccount) {
-                    if (outputAccount.accountName === selectedFile.account.accountName && outputAccount.error) {
-                        selectedFile.setStatus('danger', outputAccount.error);
-                        errorFound = true;
-                    }
-                });
-
-                if (!errorFound) {
-                    selectedFile.setStatus('success');
-                }
-            }
-        });
-
-        $downloadLink.attr({
-            'href': 'data:text/plain;charset=utf-8,' + encodeURIComponent(qifFileContent),
-            'download': qifFilename
-        });
-
-        updateSelectedFiles();
-    });
-};
-
-var createInputFileContainers = function () {
-    return _.chain(selectedFiles)
+    _.chain(selectedFilesContainer.selectedFiles)
         .filter(function (selectedFile) {
             return selectedFile.fileContent && selectedFile.account;
         })
-        .map(function (selectedFile) {
-            return _.chain(selectedFile.account)
-                .pick('fileType', 'ibanAccountNumber', 'accountName')
-                .extend({
-                    fileContent: selectedFile.fileContent,
-                    selectedFile: selectedFile
-                })
-                .value();
-        })
-        .value();
+        .each(function (selectedFile) {
+            var errorFound = false;
+
+            _.each(outputAccounts, function (outputAccount) {
+                if (outputAccount.accountName === selectedFile.account.accountName && outputAccount.error) {
+                    selectedFile.setStatus('danger', outputAccount.error);
+                    errorFound = true;
+                }
+            });
+
+            if (!errorFound) {
+                selectedFile.setStatus('success');
+            }
+        });
+
+    downloadArea.setQifFileContent(qifFileContent);
+
+    selectedFilesContainer.updateView();
 };
 
-var doConversion = function () {
-    loadContentFromInputFiles().then(function () {
+var tryToConvertSelectedFiles = function () {
+
+    loadContentFromSelectedFiles().then(function () {
         var inputFileContainers = createInputFileContainers();
-        updateSelectedFiles(inputFileContainers);
+        selectedFilesContainer.updateView();
 
         _.defer(function () {
-            convertInputFileContainers(inputFileContainers);
+            converter.convert(inputFileContainers, transactionCategorizer, handleConversionResults);
         });
     });
+
 };
 
-var loadContentFromInputFiles = function () {
+/*
+ * Read the file content from each input file.
+ *
+ * Returns a promise which will be fulfilled when the reading is done.
+ */
+var loadContentFromSelectedFiles = function () {
     var promises = [];
     var mainDeferred = Q.defer();
 
-    _.each(selectedFiles, function (selectedFile) {
+    _.each(selectedFilesContainer.selectedFiles, function (selectedFile) {
         if (!selectedFile.file || !selectedFile.account) {
             selectedFile.fileContent = null;
             selectedFile.setStatus('default');
@@ -198,23 +237,48 @@ var loadContentFromInputFiles = function () {
     return mainDeferred.promise;
 };
 
+var createInputFileContainers = function () {
+    return _.chain(selectedFilesContainer.selectedFiles)
+        .filter(function (selectedFile) {
+            return selectedFile.fileContent && selectedFile.account;
+        })
+        .map(function (selectedFile) {
+            return _.chain(selectedFile.account)
+                .pick('fileType', 'ibanAccountNumber', 'accountName')
+                .extend({
+                    fileContent: selectedFile.fileContent,
+                    selectedFile: selectedFile
+                })
+                .value();
+        })
+        .value();
+};
+
+/*
+ * Setup the file chooser button.
+ */
 var setupFileInput = function () {
     var $fileInput = $('#fileChooser input[type=file]');
 
     $fileInput.on('change', function () {
+        /*
+         * Create a SelectedFile for each input file the user has chosen.
+         */
         _.each($fileInput[0].files, function (file) {
             var selectedFile = Object.create(baseSelectedFile);
             selectedFile.file = file;
             selectedFile.filename = file.name;
 
-            $('#selectedFiles').append(selectedFile.render());
-            selectedFiles.push(selectedFile);
+            selectedFilesContainer.addSelectedFile(selectedFile);
         });
 
-        updateSelectedFiles();
+        selectedFilesContainer.updateView();
     });
 };
 
 $(function () {
+    baseSelectedFile.template = $('#selectedFileTemplate').html();
+    mustache.parse(baseSelectedFile.template);
+
     setupFileInput();
 });
