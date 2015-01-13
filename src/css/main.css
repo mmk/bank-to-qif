@@ -19,6 +19,15 @@
     display: block;
 }
 
+.accountChooser {
+    margin-top: 4px;
+}
+
+.error {
+    margin-top: 10px;
+    color: black;
+}
+
 .downloadQif {
     display: none;
 }

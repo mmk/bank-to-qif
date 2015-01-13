@@ -124,13 +124,24 @@ var baseSelectedFile = {
     },
 
     update: function () {
+        var $panel = this.$el.find('.panel');
+        var $errorRow = this.$el.find('.errorRow');
+        var $error = this.$el.find('.error');
+
         if (!this.account) {
             this.setStatus('default');
         }
 
-        var $panel = this.$el.find('.panel');
         $panel.removeClass('panel-default panel-success panel-danger');
         $panel.addClass('panel-' + this.status);
+
+        if (this.error) {
+            $errorRow.removeClass('hidden');
+            $error.text(this.error.message || 'Error');
+        }
+        else {
+            $errorRow.addClass('hidden');
+        }
     },
 
     _onChangeAccount: function (accountChooser) {
