@@ -56,7 +56,7 @@ var selectedFilesContainer = {
         var invalidOrMissing = false;
 
         _.each(this.selectedFiles, function (selectedFile) {
-            selectedFile.update();
+            selectedFile.updateView();
 
             if (selectedFile.error || !selectedFile.account) {
                 invalidOrMissing = true;
@@ -106,19 +106,31 @@ var selectedFilesContainer = {
         });
     },
 
-    accountChanged: function () {
+    tryToConvert: function () {
         this.detectAndMarkDuplicateAccounts();
         this.updateView();
 
         tryToConvertSelectedFiles();
     },
 
-    removeSelectedFile: function () {
-        // TODO
+    accountChanged: function () {
+        this.tryToConvert();
+    },
+
+    removeSelectedFile: function (selectedFile) {
+        selectedFile.$el.remove();
+
+        this.selectedFiles = _.reject(this.selectedFiles, function (sf) {
+            return sf.id === selectedFile.id;
+        });
+
+        this.tryToConvert();
     },
 
     createSelectedFile: function (file) {
         var selectedFile = Object.create(baseSelectedFile);
+        selectedFile.initId();
+
         selectedFile.file = file;
         selectedFile.filename = file.name;
 
@@ -137,6 +149,7 @@ var selectedFilesContainer = {
  * the prototype chain of every selectedFile object.
  */
 var baseSelectedFile = {
+    id: null,
     filename: null,
     file: null,
     fileContent: null,
@@ -145,8 +158,23 @@ var baseSelectedFile = {
     error: null,
     template: null,
     duplicate: false,
+    $el: null,
+
+    // Callbacks
     accountChangedCB: null,
     removeCB: null,
+
+    /*
+     * Initialize with a unique id.
+     */
+    initId: (function () {
+        var latestId = 0;
+
+        return function () {
+            latestId += 1;
+            this.id = latestId;
+        };
+    })(),
 
     _renderAccountChooser: function () {
         var $select = $('<select></select>');
@@ -166,7 +194,7 @@ var baseSelectedFile = {
         this.error = error || null;
     },
 
-    update: function () {
+    updateView: function () {
         var $panel = this.$el.find('.panel');
         var $errorRow = this.$el.find('.errorRow');
         var $error = this.$el.find('.error');
@@ -211,7 +239,7 @@ var baseSelectedFile = {
 
         this.$el.find('a[data-class=removeFile]').on('click', _.bind(function () {
             if (this.removeCB) {
-                this.removeCB();
+                this.removeCB(this);
             }
         }, this));
 
