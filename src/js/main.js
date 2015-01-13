@@ -17,16 +17,6 @@ var accountConfig          = require('./accountConfig');
 
 var transactionCategorizer = new TransactionCategorizer();
 
-/**
- * SelectedFile describes an input file chosen by the user.
- *
- * @typedef {Object} SelectedFile
- * @property {string} file - File object from the file input element.
- * @property {string} fileName - Filename of the input file.
- * @property {string} fileContent - Content of the input file.
- * @property {string} account - Account configuration.
- */
-
 var downloadArea = {
 
     qifFilename: 'result.qif',
@@ -84,18 +74,68 @@ var selectedFilesContainer = {
         }
     },
 
-    addSelectedFile: function (selectedFile) {
+    /*
+     * Detect and mark any selectedFiles for which the user has chosen a duplicate account.
+     * There can only be one input file per account.
+     */
+    detectAndMarkDuplicateAccounts: function () {
+        var accountNames = {};
+        var duplicateAccountNames = {};
+
+        _.chain(this.selectedFiles)
+            .filter(function (selectedFile) {
+                return selectedFile.account;
+            })
+            .each(function (selectedFile) {
+                var name = selectedFile.account.accountName;
+
+                if (_.has(accountNames, name)) {
+                    duplicateAccountNames[name] = true;
+                }
+
+                accountNames[name] = true;
+            });
+
+        _.each(this.selectedFiles, function (selectedFile) {
+            selectedFile.duplicate =
+                selectedFile.account && _.has(duplicateAccountNames, selectedFile.account.accountName);
+
+            if (selectedFile.duplicate) {
+                selectedFile.setStatus('danger', new Error('Only one input file per account allowed'));
+            }
+        });
+    },
+
+    accountChanged: function () {
+        this.detectAndMarkDuplicateAccounts();
+        this.updateView();
+
+        tryToConvertSelectedFiles();
+    },
+
+    removeSelectedFile: function () {
+        // TODO
+    },
+
+    createSelectedFile: function (file) {
+        var selectedFile = Object.create(baseSelectedFile);
+        selectedFile.file = file;
+        selectedFile.filename = file.name;
+
+        selectedFile.accountChangedCB = _.bind(this.accountChanged, this);
+        selectedFile.removeCB = _.bind(this.removeSelectedFile, this);
+
         var $selectedFileEl = selectedFile.render();
         this.$el.append($selectedFileEl);
 
         this.selectedFiles.push(selectedFile);
-
-        $selectedFileEl.find('a[data-class=removeFile]').on('click', function () {
-            // TODO
-        });
     }
 };
 
+/*
+ * "Selected files" are input file chosen by the user. The object baseSelectedFile is in
+ * the prototype chain of every selectedFile object.
+ */
 var baseSelectedFile = {
     filename: null,
     file: null,
@@ -104,6 +144,9 @@ var baseSelectedFile = {
     status: 'default',
     error: null,
     template: null,
+    duplicate: false,
+    accountChangedCB: null,
+    removeCB: null,
 
     _renderAccountChooser: function () {
         var $select = $('<select></select>');
@@ -137,7 +180,7 @@ var baseSelectedFile = {
 
         if (this.error) {
             $errorRow.removeClass('hidden');
-            $error.text(this.error.message || 'Error');
+            $error.text(this.error.message || 'Error');
         }
         else {
             $errorRow.addClass('hidden');
@@ -147,9 +190,10 @@ var baseSelectedFile = {
     _onChangeAccount: function (accountChooser) {
         var selectedIndex = accountChooser.selectedIndex;
         this.account = (selectedIndex === 0 ? null : accountConfig[selectedIndex - 1]);
-        this.update();
 
-        tryToConvertSelectedFiles();
+        if (this.accountChangedCB) {
+            this.accountChangedCB();
+        }
     },
 
     render: function () {
@@ -165,16 +209,19 @@ var baseSelectedFile = {
             this._onChangeAccount($accountChooser[0]);
         }, this));
 
+        this.$el.find('a[data-class=removeFile]').on('click', _.bind(function () {
+            if (this.removeCB) {
+                this.removeCB();
+            }
+        }, this));
+
         return this.$el;
     }
 };
 
-var handleConversionResults = function (outputAccounts, qifFileContent) {
+var handleConversionResults = function (outputAccounts, qifFileContent, loadedSelectedFiles) {
 
-    _.chain(selectedFilesContainer.selectedFiles)
-        .filter(function (selectedFile) {
-            return selectedFile.fileContent && selectedFile.account;
-        })
+    _.chain(loadedSelectedFiles)
         .each(function (selectedFile) {
             var errorFound = false;
 
@@ -197,12 +244,14 @@ var handleConversionResults = function (outputAccounts, qifFileContent) {
 
 var tryToConvertSelectedFiles = function () {
 
-    loadContentFromSelectedFiles().then(function () {
-        var inputFileContainers = createInputFileContainers();
+    loadContentFromSelectedFiles().then(function (loadedSelectedFiles) {
+        var inputFileContainers = createInputFileContainers(loadedSelectedFiles);
         selectedFilesContainer.updateView();
 
         _.defer(function () {
-            converter.convert(inputFileContainers, transactionCategorizer, handleConversionResults);
+            converter.convert(inputFileContainers, transactionCategorizer, function (outputAccounts, qifFileContent) {
+                handleConversionResults(outputAccounts, qifFileContent, loadedSelectedFiles);
+            });
         });
     });
 
@@ -214,15 +263,22 @@ var tryToConvertSelectedFiles = function () {
  * Returns a promise which will be fulfilled when the reading is done.
  */
 var loadContentFromSelectedFiles = function () {
+    var loadedSelectedFiles = [];
     var promises = [];
     var mainDeferred = Q.defer();
 
     _.each(selectedFilesContainer.selectedFiles, function (selectedFile) {
+        if (selectedFile.duplicate) {
+            return;
+        }
+
         if (!selectedFile.file || !selectedFile.account) {
             selectedFile.fileContent = null;
             selectedFile.setStatus('default');
             return;
         }
+
+        loadedSelectedFiles.push(selectedFile);
 
         var reader = new FileReader();
         var deferred = Q.defer();
@@ -242,27 +298,22 @@ var loadContentFromSelectedFiles = function () {
     });
 
     Q.allSettled(promises).then(function () {
-        mainDeferred.resolve();
+        mainDeferred.resolve(loadedSelectedFiles);
     });
 
     return mainDeferred.promise;
 };
 
-var createInputFileContainers = function () {
-    return _.chain(selectedFilesContainer.selectedFiles)
-        .filter(function (selectedFile) {
-            return selectedFile.fileContent && selectedFile.account;
-        })
-        .map(function (selectedFile) {
-            return _.chain(selectedFile.account)
-                .pick('fileType', 'ibanAccountNumber', 'accountName')
-                .extend({
-                    fileContent: selectedFile.fileContent,
-                    selectedFile: selectedFile
-                })
-                .value();
-        })
-        .value();
+var createInputFileContainers = function (loadedSelectedFiles) {
+    return _.map(loadedSelectedFiles, function (selectedFile) {
+        return _.chain(selectedFile.account)
+            .pick('fileType', 'ibanAccountNumber', 'accountName')
+            .extend({
+                fileContent: selectedFile.fileContent,
+                selectedFile: selectedFile
+            })
+            .value();
+    });
 };
 
 /*
@@ -273,14 +324,10 @@ var setupFileInput = function () {
 
     $fileInput.on('change', function () {
         /*
-         * Create a SelectedFile for each input file the user has chosen.
+         * Create a "selected file" for each input file the user has chosen.
          */
         _.each($fileInput[0].files, function (file) {
-            var selectedFile = Object.create(baseSelectedFile);
-            selectedFile.file = file;
-            selectedFile.filename = file.name;
-
-            selectedFilesContainer.addSelectedFile(selectedFile);
+            selectedFilesContainer.createSelectedFile(file);
         });
 
         selectedFilesContainer.updateView();
