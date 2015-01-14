@@ -48,37 +48,13 @@ var downloadArea = {
 
 };
 
-var selectedFilesContainer = {
-    $el: $('#selectedFilesContainer'),
-    selectedFiles: [],
-
-    updateView: function () {
-        var invalidOrMissing = false;
-
-        _.each(this.selectedFiles, function (selectedFile) {
-            selectedFile.updateView();
-
-            if (selectedFile.error || !selectedFile.account) {
-                invalidOrMissing = true;
-            }
-        });
-
-        if (this.selectedFiles.length === 0) {
-            downloadArea.hide();
-        }
-        else if (invalidOrMissing) {
-            downloadArea.displayInstructions();
-        }
-        else {
-            downloadArea.displayDownloadLink();
-        }
-    },
+var selectedFilesContainer = (function () {
 
     /*
      * Detect and mark any selectedFiles for which the user has chosen a duplicate account.
      * There can only be one input file per account.
      */
-    detectAndMarkDuplicateAccounts: function () {
+    var detectAndMarkDuplicateAccounts = function () {
         var accountNames = {};
         var duplicateAccountNames = {};
 
@@ -104,79 +80,93 @@ var selectedFilesContainer = {
                 selectedFile.setStatus('danger', new Error('Only one input file per account allowed'));
             }
         });
-    },
+    };
 
-    tryToConvert: function () {
-        this.detectAndMarkDuplicateAccounts();
+    var tryToConvert = function () {
+        detectAndMarkDuplicateAccounts.call(this);
         this.updateView();
 
         tryToConvertSelectedFiles();
-    },
+    };
 
-    accountChanged: function () {
-        this.tryToConvert();
-    },
+    return {
+        $el: $('#selectedFilesContainer'),
+        selectedFiles: [],
 
-    removeSelectedFile: function (selectedFile) {
-        selectedFile.$el.remove();
+        updateView: function () {
+            var invalidOrMissing = false;
 
-        this.selectedFiles = _.reject(this.selectedFiles, function (sf) {
-            return sf.id === selectedFile.id;
-        });
+            _.each(this.selectedFiles, function (selectedFile) {
+                selectedFile.updateView();
 
-        this.tryToConvert();
-    },
+                if (selectedFile.error || !selectedFile.account) {
+                    invalidOrMissing = true;
+                }
+            });
 
-    createSelectedFile: function (file) {
-        var selectedFile = Object.create(baseSelectedFile);
-        selectedFile.initId();
+            if (this.selectedFiles.length === 0) {
+                downloadArea.hide();
+            }
+            else if (invalidOrMissing) {
+                downloadArea.displayInstructions();
+            }
+            else {
+                downloadArea.displayDownloadLink();
+            }
+        },
 
-        selectedFile.file = file;
-        selectedFile.filename = file.name;
+        accountChanged: function () {
+            tryToConvert.call(this);
+        },
 
-        selectedFile.accountChangedCB = _.bind(this.accountChanged, this);
-        selectedFile.removeCB = _.bind(this.removeSelectedFile, this);
+        removeSelectedFile: function (selectedFile) {
+            selectedFile.$el.remove();
 
-        var $selectedFileEl = selectedFile.render();
-        this.$el.append($selectedFileEl);
+            this.selectedFiles = _.reject(this.selectedFiles, function (sf) {
+                return sf.id === selectedFile.id;
+            });
 
-        this.selectedFiles.push(selectedFile);
-    }
-};
+            tryToConvert.call(this);
+        },
+
+        createSelectedFile: function (file) {
+            var selectedFile = Object.create(baseSelectedFile);
+            selectedFile.initId();
+
+            selectedFile.file = file;
+            selectedFile.filename = file.name;
+
+            selectedFile.accountChangedCB = _.bind(this.accountChanged, this);
+            selectedFile.removeCB = _.bind(this.removeSelectedFile, this);
+
+            var $selectedFileEl = selectedFile.render();
+            this.$el.append($selectedFileEl);
+
+            this.selectedFiles.push(selectedFile);
+        }
+    };
+
+})();
 
 /*
  * "Selected files" are input file chosen by the user. The object baseSelectedFile is in
  * the prototype chain of every selectedFile object.
  */
-var baseSelectedFile = {
-    id: null,
-    filename: null,
-    file: null,
-    fileContent: null,
-    account: null,
-    status: 'default',
-    error: null,
-    template: null,
-    duplicate: false,
-    $el: null,
+var baseSelectedFile = (function () {
 
-    // Callbacks
-    accountChangedCB: null,
-    removeCB: null,
+    var template = $('#selectedFileTemplate').html();
+    mustache.parse(template);
 
-    /*
-     * Initialize with a unique id.
-     */
-    initId: (function () {
-        var latestId = 0;
+    var onChangeAccount = function (accountChooser) {
+        var selectedIndex = accountChooser.selectedIndex;
+        this.account = (selectedIndex === 0 ? null : accountConfig[selectedIndex - 1]);
 
-        return function () {
-            latestId += 1;
-            this.id = latestId;
-        };
-    })(),
+        if (this.accountChangedCB) {
+            this.accountChangedCB();
+        }
+    };
 
-    _renderAccountChooser: function () {
+    var renderAccountChooser = function () {
         var $select = $('<select></select>');
         $select.append('<option value="-1">Choose bank account</option>');
 
@@ -187,65 +177,83 @@ var baseSelectedFile = {
         });
 
         return $select;
-    },
+    };
 
-    setStatus: function (status, error) {
-        this.status = status;
-        this.error = error || null;
-    },
+    return {
+        id: null,
+        filename: null,
+        file: null,
+        fileContent: null,
+        account: null,
+        status: 'default',
+        error: null,
+        duplicate: false,
+        $el: null,
 
-    updateView: function () {
-        var $panel = this.$el.find('.panel');
-        var $errorRow = this.$el.find('.errorRow');
-        var $error = this.$el.find('.error');
+        // Callbacks
+        accountChangedCB: null,
+        removeCB: null,
 
-        if (!this.account) {
-            this.setStatus('default');
-        }
+        /*
+         * Initialize with a unique id.
+         */
+        initId: (function () {
+            var latestId = 0;
 
-        $panel.removeClass('panel-default panel-success panel-danger');
-        $panel.addClass('panel-' + this.status);
+            return function () {
+                latestId += 1;
+                this.id = latestId;
+            };
+        })(),
 
-        if (this.error) {
-            $errorRow.removeClass('hidden');
-            $error.text(this.error.message || 'Error');
-        }
-        else {
-            $errorRow.addClass('hidden');
-        }
-    },
+        setStatus: function (status, error) {
+            this.status = status;
+            this.error = error || null;
+        },
 
-    _onChangeAccount: function (accountChooser) {
-        var selectedIndex = accountChooser.selectedIndex;
-        this.account = (selectedIndex === 0 ? null : accountConfig[selectedIndex - 1]);
+        updateView: function () {
+            var $panel = this.$el.find('.panel');
+            var $errorRow = this.$el.find('.errorRow');
+            var $error = this.$el.find('.error');
 
-        if (this.accountChangedCB) {
-            this.accountChangedCB();
-        }
-    },
-
-    render: function () {
-        this.$el = $(mustache.render(this.template, {
-            filename: this.filename,
-            status: this.status
-        }));
-
-        var $accountChooser = this._renderAccountChooser();
-        this.$el.find('.accountChooser').append($accountChooser);
-
-        $accountChooser.on('change', _.bind(function () {
-            this._onChangeAccount($accountChooser[0]);
-        }, this));
-
-        this.$el.find('a[data-class=removeFile]').on('click', _.bind(function () {
-            if (this.removeCB) {
-                this.removeCB(this);
+            if (!this.account) {
+                this.setStatus('default');
             }
-        }, this));
 
-        return this.$el;
-    }
-};
+            $panel.removeClass('panel-default panel-success panel-danger');
+            $panel.addClass('panel-' + this.status);
+
+            if (this.error) {
+                $errorRow.removeClass('hidden');
+                $error.text(this.error.message || 'Error');
+            }
+            else {
+                $errorRow.addClass('hidden');
+            }
+        },
+
+        render: function () {
+            this.$el = $(mustache.render(template, {
+                filename: this.filename,
+                status: this.status
+            }));
+
+            var $accountChooser = renderAccountChooser.call(this);
+            this.$el.find('.accountChooser').append($accountChooser);
+
+            $accountChooser.on('change', _.bind(onChangeAccount, this, $accountChooser[0]));
+
+            this.$el.find('a[data-class=removeFile]').on('click', _.bind(function () {
+                if (this.removeCB) {
+                    this.removeCB(this);
+                }
+            }, this));
+
+            return this.$el;
+        }
+    };
+
+})();
 
 var handleConversionResults = function (outputAccounts, qifFileContent, loadedSelectedFiles) {
 
@@ -363,8 +371,5 @@ var setupFileInput = function () {
 };
 
 $(function () {
-    baseSelectedFile.template = $('#selectedFileTemplate').html();
-    mustache.parse(baseSelectedFile.template);
-
     setupFileInput();
 });
