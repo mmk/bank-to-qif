@@ -13,7 +13,7 @@ var mustache = require('mustache');
 
 var converter              = require('./converter/converter');
 var TransactionCategorizer = require('./converter/transactionCategorizer');
-var accountConfig          = require('./accountConfig');
+var config                 = require('./config');
 
 var transactionCategorizer = new TransactionCategorizer();
 
@@ -149,7 +149,7 @@ var selectedFilesContainer = (function () {
 })();
 
 /*
- * "Selected files" are input file chosen by the user. The object baseSelectedFile is in
+ * "Selected files" are input files chosen by the user. The object baseSelectedFile is in
  * the prototype chain of every selectedFile object.
  */
 var baseSelectedFile = (function () {
@@ -159,7 +159,7 @@ var baseSelectedFile = (function () {
 
     var onChangeAccount = function (accountChooser) {
         var selectedIndex = accountChooser.selectedIndex;
-        this.account = (selectedIndex === 0 ? null : accountConfig[selectedIndex - 1]);
+        this.account = (selectedIndex === 0 ? null : config.accounts[selectedIndex - 1]);
 
         if (this.accountChangedCB) {
             this.accountChangedCB();
@@ -170,7 +170,7 @@ var baseSelectedFile = (function () {
         var $select = $('<select></select>');
         $select.append('<option value="-1">Choose bank account</option>');
 
-        _.each(accountConfig, function (accountConfigItem) {
+        _.each(config.accounts, function (accountConfigItem) {
             var $option = $('<option></option>');
             $option.append(accountConfigItem.accountName);
             $select.append($option);
@@ -285,9 +285,10 @@ var tryToConvertSelectedFiles = function () {
         selectedFilesContainer.updateView();
 
         _.defer(function () {
-            converter.convert(inputFileContainers, transactionCategorizer, function (outputAccounts, qifFileContent) {
-                handleConversionResults(outputAccounts, qifFileContent, loadedSelectedFiles);
-            });
+            converter.convert(inputFileContainers, transactionCategorizer, config.selfRegExps,
+                function (outputAccounts, qifFileContent) {
+                    handleConversionResults(outputAccounts, qifFileContent, loadedSelectedFiles);
+                });
         });
     });
 

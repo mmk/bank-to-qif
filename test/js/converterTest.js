@@ -28,20 +28,21 @@ describe('converter', function () {
                 {
                     fileContent: opFileContent,
                     fileType: 'op',
-                    ibanAccountNumber: 'FI123123123123',
+                    ibanAccountNumber: 'FI11 2222 2323 4444 55',
                     accountName: 'Assets:Current Assets:OP account'
                 },
                 {
                     fileContent: nordeaFileContent,
                     fileType: 'nordea',
-                    ibanAccountNumber: 'FI1234567890123456',
+                    ibanAccountNumber: 'FI99 8888 7777 6666 55',
                     accountName: 'Assets:Current Assets:Nordea account'
                 }
             ];
 
-            var transactionCategorizer = new TransactionCategorizer();
+            var categorizer = new TransactionCategorizer();
+            var selfRegExps = [ /john smith/i, /smith john/i ];
 
-            converter.convert(inputFileContainers, transactionCategorizer, function (outputAccounts, qifFileContent) {
+            converter.convert(inputFileContainers, categorizer, selfRegExps, function (outputAccounts, qifFileContent) {
                 try {
                     should(outputAccounts).not.be.null;
                     outputAccounts.should.be.instanceof(Array).and.have.lengthOf(2);

@@ -10,6 +10,7 @@ var Q = require('q');
 var nordeaBankImporter = require('./nordeaBankImporter');
 var opBankImporter     = require('./opBankImporter');
 var qifExporter        = require('./qifExporter');
+var myAccountsTool     = require('./myAccountsTool');
 
 /**
  * QIF transaction.
@@ -37,6 +38,7 @@ var qifExporter        = require('./qifExporter');
  *
  * @typedef {Object} OutputAccount
  * @property {string} accountName - Name of the account in GnuCash or other software. Example: 'Assets:Current Assets:Nordea account'.
+ * @property {string} ibanAccountNumber - International Bank Account Number.
  * @property {Transaction[]} transactions - Loaded transactions, or null if conversion failed.
  * @property {Error} error - Error object if an error occurred during conversion, null otherwise.
  */
@@ -57,6 +59,7 @@ var importTransactions = function (inputFileContainers) {
 
         var outputAccount = {
             accountName: inputFileContainer.accountName,
+            ibanAccountNumber: inputFileContainer.ibanAccountNumber,
             transactions: null,
             error: null
         };
@@ -106,13 +109,6 @@ var categorizeTransactions = function (outputAccounts, transactionCategorizer) {
 };
 
 /*
- * Find transactions between user's own accounts, fix their categories and remove duplicate transactions.
- */
-var handleTransactionsBetweenOwnAccounts = function (outputAccounts) {
-    // TODO
-};
-
-/*
  * Generate a QIF file with all successfully loaded transactions from all accounts.
  */
 var generateQifFileContent = function (outputAccounts) {
@@ -137,14 +133,17 @@ var generateQifFileContent = function (outputAccounts) {
  * the transactions property set to null.
  *
  * @param {InputFileContainer[]} inputFileContainers - The input files to convert.
+ * @param transactionCategorizer - Instance of TransactionCategorizer to be used.
+ * @param {RegExp[]} selfRegExps - Regular expressions to be used to recognize user's own name on transactions.
+ *                                 For example, [ /john smith/i ].
  * @param {ConversionDoneCallback} callback - The callback function.
  */
-var convert = function (inputFileContainers, transactionCategorizer, callback) {
+var convert = function (inputFileContainers, transactionCategorizer, selfRegExps, callback) {
     importTransactions(inputFileContainers).then(function (outputAccounts) {
         var qifFileContent;
 
         categorizeTransactions(outputAccounts, transactionCategorizer);
-        handleTransactionsBetweenOwnAccounts(outputAccounts);
+        myAccountsTool.handleTransactionsBetweenMyAccounts(outputAccounts, selfRegExps);
         qifFileContent = generateQifFileContent(outputAccounts);
 
         callback(outputAccounts, qifFileContent);
