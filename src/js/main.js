@@ -257,21 +257,20 @@ var baseSelectedFile = (function () {
 
 var handleConversionResults = function (outputAccounts, qifFileContent, loadedSelectedFiles) {
 
-    _.chain(loadedSelectedFiles)
-        .each(function (selectedFile) {
-            var errorFound = false;
+    _.each(loadedSelectedFiles, function (selectedFile) {
+        var errorFound = false;
 
-            _.each(outputAccounts, function (outputAccount) {
-                if (outputAccount.accountName === selectedFile.account.accountName && outputAccount.error) {
-                    selectedFile.setStatus('danger', outputAccount.error);
-                    errorFound = true;
-                }
-            });
-
-            if (!errorFound) {
-                selectedFile.setStatus('success');
+        _.each(outputAccounts, function (outputAccount) {
+            if (outputAccount.accountName === selectedFile.account.accountName && outputAccount.error) {
+                selectedFile.setStatus('danger', outputAccount.error);
+                errorFound = true;
             }
         });
+
+        if (!errorFound) {
+            selectedFile.setStatus('success');
+        }
+    });
 
     downloadArea.setQifFileContent(qifFileContent);
 
