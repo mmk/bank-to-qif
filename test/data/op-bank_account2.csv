@@ -1,0 +1,6 @@
+Kirjausp‰iv‰;Arvop‰iv‰;M‰‰r‰† EUROA;"Laji";Selitys;Saaja/Maksaja;Saajan tilinumero ja pankin BIC;Viite;Viesti;Arkistointitunnus;
+01.07.2014;01.07.2014;-88,00;"105";TILISIIRTO;"John Doe";FI00 0000 0000 0000 00 / OKOYFIHH;"";Viesti: payment   ;
+08.07.2014;08.07.2014;450,00;"505";PANO;"SMITH JOHN";;"";Viesti: OP1 to OP2   ;
+14.07.2014;14.07.2014;-14,90;"162";PKORTTIMAKSU;"12345 restaurant";;"";Viesti: 3123123  ;123
+
+

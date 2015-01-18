@@ -34,23 +34,28 @@ var describeImporterFunctions = function (importer, fileContent, expectedTransac
 
         it('should import transactions correctly when the file is valid', function (done) {
             importer.importTransactions(fileContent).then(function (transactions) {
-                should(transactions).not.be.null;
-                transactions.should.be.instanceof(Array).have.lengthOf(expectedTransactionCount);
-                done();
+                try {
+                    should(transactions).not.be.null;
+                    transactions.should.be.instanceof(Array).have.lengthOf(expectedTransactionCount);
+                    done();
+                }
+                catch (e) {
+                    done(e);
+                }
             });
         });
     });
 };
 
 describe('opBankImporter', function() {
-    var fileContentBuffer = fs.readFileSync(__dirname + '/../data/op-bank_account.csv');
+    var fileContentBuffer = fs.readFileSync(__dirname + '/../data/op-bank_account1.csv');
     var fileContent = iconv.decode(fileContentBuffer, 'iso-8859-15');
 
-    describeImporterFunctions(opBankImporter, fileContent, 7);
+    describeImporterFunctions(opBankImporter, fileContent, 9);
 });
 
 describe('nordeaBankImporter', function() {
-    var fileContent = fs.readFileSync(__dirname + '/../data/nordea-bank_account.csv', { encoding: 'utf8' });
+    var fileContent = fs.readFileSync(__dirname + '/../data/nordea-bank_account1.csv', { encoding: 'utf8' });
 
-    describeImporterFunctions(nordeaBankImporter, fileContent, 5);
+    describeImporterFunctions(nordeaBankImporter, fileContent, 7);
 });
