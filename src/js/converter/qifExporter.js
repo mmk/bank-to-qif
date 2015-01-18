@@ -26,9 +26,9 @@ var generateQifAccountList = function (outputAccounts) {
 var generateQifTransaction = function (transaction) {
     var output = "";
 
-    output += 'D' + transaction.date + "\n";
+    output += 'D' + transaction.dateStr + "\n";
     output += 'P' + transaction.payee + "\n";
-    output += 'T' + transaction.amount + "\n";
+    output += 'T' + transaction.amountStr + "\n";
 
     if (transaction.category) {
         output += 'L[' + transaction.category + "]\n";

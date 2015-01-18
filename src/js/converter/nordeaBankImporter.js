@@ -8,6 +8,8 @@ var _        = require('underscore');
 var csvParse = require('csv-parse');
 var Q        = require('q');
 
+var importerHelper = require('./importerHelper');
+
 var generateMemoProperty = function (record) {
     var transactionTypeField = record[7].trim();
     var messageField = record[10].trim();
@@ -38,20 +40,30 @@ var generateTransaction = function (record) {
      * 'BIC', 'Tapahtuma', 'Viite', 'Maksajan viite', 'Viesti', 'Kortinnumero', 'Kuitti'
      */
 
+    if (!_.isArray(record) || record.length < 13) {
+        return null;
+    }
+
     var transaction = {};
 
-    // Convert date to "MM/DD/YYYY" format
-    transaction.date = record[2].replace(/(\d+)\.(\d+)\.(\d+)/, '$2/$1/$3');
+    transaction.date = importerHelper.parseDate(record[2]);
+    transaction.dateStr = importerHelper.dateToString(transaction.date);
 
     transaction.payee = record[4];
 
-    // Replace comma with dot as decimal separator and remove all whitespace
-    transaction.amount = record[3].replace(/,/, '.').replace(/\s/g, '');
+    transaction.amount = importerHelper.parseAmount(record[3]);
+    transaction.amountStr = (transaction.amount ? transaction.amount.toFixed(2) : null);
+
+    transaction.targetAccountDescription = record[5];
 
     // Categorization is handled outside of the importer
     transaction.category = null;
 
     transaction.memo = generateMemoProperty(record);
+
+    if (!transaction.date || !transaction.dateStr || !transaction.amount || !transaction.amountStr) {
+        return null;
+    }
 
     return transaction;
 };
@@ -78,23 +90,31 @@ var importTransactions = function (fileContent) {
     var deferred = Q.defer();
 
     if (!isSupportedFile(fileContent)) {
-        deferred.reject(new Error('Input file not supported by NordeaBankImporter'));
+        deferred.reject(new Error('Input file not recognized as a Nordea file'));
         return deferred.promise;
     }
 
     var transactions = [];
 
     csvParse(fileContent, {delimiter: "\t"}, function (err, data) {
-        _.each(data, function (record, index) {
-          if (index < 3 || record.length === 1) {
-              return; // Skip the header and empty rows
-          }
+        var success = _.every(data, function (record, index) {
+            if (index < 3 || record.length === 1) {
+                return true; // Skip the header and empty rows
+            }
 
-          transactions.push(generateTransaction(record));
+            var transaction = generateTransaction(record);
+            if (!transaction) {
+                deferred.reject(new Error('Corrupted content in Nordea input file'));
+                return false;
+            }
 
+            transactions.push(transaction);
+            return true;
         });
 
-        deferred.resolve(transactions);
+        if (success) {
+            deferred.resolve(transactions);
+        }
     });
 
     return deferred.promise;

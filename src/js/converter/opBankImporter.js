@@ -8,6 +8,8 @@ var _        = require('underscore');
 var csvParse = require('csv-parse');
 var Q        = require('q');
 
+var importerHelper = require('./importerHelper');
+
 var generatePayeeProperty = function (record) {
     var explanationField = record[4].trim();
 
@@ -39,21 +41,31 @@ var generateTransaction = function (record) {
      * 'Saajan tilinumero ja pankin BIC', 'Viite', 'Viesti', 'Arkistointitunnus'
      */
 
+    if (!_.isArray(record) || record.length < 10) {
+        return null;
+    }
+
     var transaction = {};
 
-    // Convert date to "MM/DD/YYYY" format
-    transaction.date = record[0].replace(/(\d+)\.(\d+)\.(\d+)/, '$2/$1/$3');
+    transaction.date = importerHelper.parseDate(record[0]);
+    transaction.dateStr = importerHelper.dateToString(transaction.date);
 
     transaction.payee = generatePayeeProperty(record);
 
-    // Replace comma with dot as decimal separator and remove all whitespace
-    transaction.amount = record[2].replace(/,/, '.').replace(/\s/g, '');
+    transaction.amount = importerHelper.parseAmount(record[2]);
+    transaction.amountStr = (transaction.amount ? transaction.amount.toFixed(2) : null);
+
+    transaction.targetAccountDescription = record[6];
 
     // Categorization is handled outside of the importer
     transaction.category = null;
 
     // TODO: Should we append memo to payee field so that it shows up in GnuCash?
     transaction.memo = generateMemoProperty(record);
+
+    if (!transaction.date || !transaction.dateStr || !transaction.amount || !transaction.amountStr) {
+        return null;
+    }
 
     return transaction;
 };
@@ -77,20 +89,29 @@ var importTransactions = function (fileContent) {
     var transactions = [];
 
     if (!this.isSupportedFile(fileContent)) {
-        deferred.reject(new Error('Input file not supported by OPBankImporter'));
+        deferred.reject(new Error('Input file not recognized as an OP file'));
         return deferred.promise;
     }
 
     csvParse(fileContent, {delimiter: ';'}, function (err, data) {
-        _.each(data, function (record, index) {
-          if (index === 0 || record.length === 1) {
-              return; // Skip the header and empty lines
-          }
+        var success = _.every(data, function (record, index) {
+            if (index === 0 || record.length === 1) {
+                return true; // Skip the header and empty lines
+            }
 
-          transactions.push(generateTransaction(record));
+            var transaction = generateTransaction(record);
+            if (!transaction) {
+                deferred.reject(new Error('Corrupted content in OP input file'));
+                return false;
+            }
+
+            transactions.push(transaction);
+            return true;
         }, this);
 
-        deferred.resolve(transactions);
+        if (success) {
+            deferred.resolve(transactions);
+        }
     });
 
     return deferred.promise;
